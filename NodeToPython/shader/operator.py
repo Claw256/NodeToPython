@@ -21,11 +21,17 @@ class NTPShaderOperator(NTP_Operator):
     #TODO: add option for general shader node groups
     material_name: bpy.props.StringProperty(name="Node Group")
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
         self._node_infos = node_settings
         for name in SHADER_OP_RESERVED_NAMES:
             self._used_vars[name] = 0
+
+    def _setup_addon_zip_name(self, name: str) -> str:
+        """
+        Cleans the name for the zip file
+        """
+        return name
     
     def _create_material(self, indent_level: int):
         self._write(f"{MAT_VAR} = bpy.data.materials.new("
@@ -43,7 +49,7 @@ class NTPShaderOperator(NTP_Operator):
         nt_name (str): name to use for the node tree
         """
         self._write(f"#initialize {nt_name} node group", self._outer_indent_level)
-        self._write(f"def {ntp_node_tree.var}_node_group():\n", self._outer_indent_level)
+        self._write(f"def {ntp_node_tree.var}_node_group():\\n", self._outer_indent_level)
 
         if ntp_node_tree.node_tree == self._base_node_tree:
             self._write(f"{ntp_node_tree.var} = {MAT_VAR}.node_tree")
@@ -121,10 +127,10 @@ class NTPShaderOperator(NTP_Operator):
         #create connections
         self._init_links(node_tree)
         
-        self._write(f"return {nt_var}\n")
+        self._write(f"return {nt_var}\\n")
 
         #create node group
-        self._write(f"{nt_var} = {nt_var}_node_group()\n", self._outer_indent_level)
+        self._write(f"{nt_var} = {nt_var}_node_group()\\n", self._outer_indent_level)
         
 
     def execute(self, context):
@@ -150,15 +156,15 @@ class NTPShaderOperator(NTP_Operator):
 
             self._file = open(f"{self._addon_dir}/__init__.py", "w")
 
-            self._create_header(self.material_name)
-            self._class_name = clean_string(self.material_name, lower=False)
-            self._init_operator(mat_var, self.material_name)
+            self._create_header(mat_var)
+            self._class_name = clean_string(mat_var, lower=False)
+            self._init_operator(mat_var, mat_var)
 
             self._write("def execute(self, context):", 1)
         else:
             self._file = StringIO("")
             if self._include_imports:
-                self._file.write("import bpy, mathutils\n\n")
+                self._file.write("import bpy, mathutils\\n\\n")
 
         if self._mode == 'ADDON':
             self._create_material(2)
@@ -190,3 +196,42 @@ class NTPShaderOperator(NTP_Operator):
         self._report_finished("material")
 
         return {'FINISHED'}
+    
+    def _create_var(self, name: str) -> str:
+        """
+        Creates a variable name
+        """
+        if name in self._used_vars:
+            self._used_vars[name] += 1
+            var = f"{name}_{self._used_vars[name]}"
+        else:
+            self._used_vars[name] = 0
+            var = name
+        return var
+
+    def _create_header(self, name: str):
+        """
+        Creates the header for the add-on
+        """
+        self._write("bl_info = {", 0)
+        self._write(f'    "name" : {str_to_py_str(name)},', 1)
+        self._write(f'    "description" : {str_to_py_str(name)},', 1)
+        self._write('    "author" : "Rexami",', 1)
+        self._write('    "version" : (1, 0, 0),', 1)
+        self._write('    "blender" : (4, 4, 0),', 1)
+        self._write('    "location" : "Node",', 1)
+        self._write('    "category" : "Node",', 1)
+        self._write("}", 0)
+        self._write("", 0)
+        self._write("import bpy", 0)
+        self._write("import mathutils", 0)
+        self._write("import os", 0)
+        self._write("", 0)
+
+    def _write(self, string: str, indent_level: int = 0):
+        """
+        Writes a string to the file with the correct indentation
+        """
+        if not string.endswith("\\n"):
+            string += "\\n"
+        self._file.write(f"{'    ' * indent_level}{string}")

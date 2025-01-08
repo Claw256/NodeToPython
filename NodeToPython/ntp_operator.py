@@ -64,8 +64,8 @@ class NTP_Operator(Operator):
             bpy.types.NodeTreeInterfaceSocketTexture
         }
 
-    def __init__(self):
-        super().__init__()
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
         # Write functions after nodes are mostly initialized and linked up
         self._write_after_links: list[Callable] = []
@@ -188,10 +188,21 @@ class NTP_Operator(Operator):
         
         return True
 
+    def _setup_addon_name(self, name: str) -> str:
+        """
+        Prefixes the name of the add-on
+        """
+        return f"ntp_{name}"
+
+    def _setup_addon_zip_name(self, name: str) -> str:
+        """
+        Prefixes the name of the add-on
+        """
+        return self._setup_addon_name(name)
+
     def _create_header(self, name: str) -> None:
         """
         Sets up the bl_info and imports the Blender API
-
         Parameters:
         file (TextIO): the file for the generated add-on
         name (str): name of the add-on
@@ -227,9 +238,10 @@ class NTP_Operator(Operator):
         idname (str): name for the operator
         label (str): appearence inside Blender
         """
-        self._idname = idname
+        self._idname = clean_string(idname, lower=False)
+        self._class_name = self._create_var(self._idname)
         self._write(f"class {self._class_name}(bpy.types.Operator):", 0)
-        self._write(f"bl_idname = \"node.{idname}\"", 1)
+        self._write(f"bl_idname = \"node.{self._idname}\"", 1)
         self._write(f"bl_label = {str_to_py_str(label)}", 1)
         self._write("bl_options = {\'REGISTER\', \'UNDO\'}\n", 1)
 
@@ -316,6 +328,7 @@ class NTP_Operator(Operator):
 
         idname = str_to_py_str(node.bl_idname)
         self._write(f"{node_var} = {node_tree_var}.nodes.new({idname})")
+        self._write(f"{node_var}.name = {str_to_py_str(node.name)}")
 
         # label
         if node.label:
@@ -1494,7 +1507,7 @@ class NTP_Operator(Operator):
         def _create_manifest(self) -> None:
             manifest = open(f"{self._addon_dir}/blender_manifest.toml", "w")
             manifest.write("schema_version = \"1.0.0\"\n\n")
-            manifest.write(f"id = {str_to_py_str(self._idname)}\n")
+            manifest.write(f"id = {str_to_py_str(clean_string(self._idname, lower=False))}\n")
 
             manifest.write(f"version = {version_to_manifest_str(self._version)}\n")
             manifest.write(f"name = {str_to_py_str(self._name)}\n")
@@ -1541,5 +1554,5 @@ class NTP_Operator(Operator):
         self.report({'INFO'}, f"NodeToPython: Saved {object} to {location}")
 
     # ABSTRACT
-    def execute(self):
+    def execute(self, context):
         return {'FINISHED'}

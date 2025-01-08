@@ -21,13 +21,15 @@ def clean_string(string: str, lower: bool = True) -> str:
 
     if lower:
         string = string.lower()
-    string = re.sub(r"[^a-zA-Z0-9_]", '_', string)
+    string = re.sub(r"[^a-zA-Z0-9]", '', string)
 
     if keyword.iskeyword(string):
         string = "_" + string
-    elif not (string[0].isalpha() or string[0] == '_'):
+    elif not (string[0].isalpha() or string[0] == '_') and not string[0].isdigit():
         string = "_" + string
 
+    if string:
+        string = "ntp_" + string
     return string
 
 def enum_to_py_str(enum: str) -> str:
